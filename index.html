@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebBeats - Music Streaming</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="app">
+        <div class="sidebar">
+            <div class="logo-container">
+                <img src="/2025_04_19_0z5_Kleki.png" alt="WebBeats Logo" class="logo">
+                <h1>WebBeats</h1>
+            </div>
+            <nav>
+                <ul>
+                    <li :class="{ active: currentView === 'home' }" @click="currentView = 'home'"><i class="fas fa-home"></i> Home</li>
+                    <li :class="{ active: currentView === 'search' }" @click="currentView = 'search'"><i class="fas fa-search"></i> Search</li>
+                    <li :class="{ active: currentView === 'library' }" @click="currentView = 'library'"><i class="fas fa-book"></i> Your Library</li>
+                    <li :class="{ active: currentView === 'upload' }" @click="currentView = 'upload'"><i class="fas fa-upload"></i> Upload</li>
+                    <li class="separator"></li>
+                    <li :class="{ active: currentView === 'news' }" @click="currentView = 'news'"><i class="fas fa-newspaper"></i> News</li>
+                    <li :class="{ active: currentView === 'liked' }" @click="currentView = 'liked'"><i class="fas fa-heart"></i> Liked Songs</li>
+                    <li :class="{ active: currentView === 'playlists' }" @click="currentView = 'playlists'"><i class="fas fa-list"></i> Playlists</li>
+                </ul>
+            </nav>
+            <div class="playlists" v-if="playlists.length > 0">
+                <h3>PLAYLISTS</h3>
+                <ul>
+                    <li v-for="playlist in playlists" :key="playlist.id" @click="loadPlaylist(playlist)">
+                        {{ playlist.name }}
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Dev Mode Panel -->
+            <div v-if="devMode" class="dev-mode-panel">
+                <h3>Developer Mode</h3>
+                <div class="dev-info" v-if="currentTrack">
+                    <pre>{{ JSON.stringify(currentTrack, null, 2) }}</pre>
+                </div>
+                <div class="dev-info" v-else>
+                    <pre>No song playing</pre>
+                </div>
+                <div class="dev-tip">Press Ctrl+. to toggle dev mode</div>
+            </div>
+
+            <!-- Home View -->
+            <div v-if="currentView === 'home'">
+                <section class="featured-content" v-if="featuredSongs.length > 0">
+                    <div class="section-header">
+                        <h2>Featured</h2>
+                        <a href="#" class="see-all">See all</a>
+                    </div>
+                    <div class="card-grid">
+                        <div v-for="song in featuredSongs" :key="song.id" class="card" @click="playSong(song)">
+                            <div class="card-img">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title" class="song-cover">
+                                <button class="play-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.username }}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="featured-content" v-if="recentlyUploaded.length > 0">
+                    <div class="section-header">
+                        <h2>Recently Uploaded</h2>
+                        <a href="#" class="see-all" @click.prevent="currentView = 'search'; searchFilters.sortBy = 'recent'">See all</a>
+                    </div>
+                    <div class="card-grid">
+                        <div v-for="song in recentlyUploaded" :key="song.id" class="card" @click="playSong(song)">
+                            <div class="card-img">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title" class="song-cover">
+                                <button class="play-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.username }}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="recently-played" v-if="mostPlayed.length > 0">
+                    <div class="section-header">
+                        <h2>Most Played</h2>
+                        <a href="#" class="see-all" @click.prevent="currentView = 'search'; searchFilters.sortBy = 'plays'">See all</a>
+                    </div>
+                    <div class="card-grid">
+                        <div v-for="song in mostPlayed" :key="song.id" class="card" @click="playSong(song)">
+                            <div class="card-img">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title" class="song-cover">
+                                <button class="play-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.plays }} plays</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="most-liked" v-if="mostLiked.length > 0">
+                    <div class="section-header">
+                        <h2>Most Liked</h2>
+                        <a href="#" class="see-all" @click.prevent="currentView = 'search'; searchFilters.sortBy = 'likes'">See all</a>
+                    </div>
+                    <div class="card-grid">
+                        <div v-for="song in mostLiked" :key="song.id" class="card" @click="playSong(song)">
+                            <div class="card-img">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title" class="song-cover">
+                                <button class="play-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.likes }} likes</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="made-for-you" v-if="recentlyPlayedByYou.length > 0">
+                    <div class="section-header">
+                        <h2>Recently Played By You</h2>
+                        <a href="#" class="see-all">See all</a>
+                    </div>
+                    <div class="card-grid">
+                        <div v-for="song in recentlyPlayedByYou" :key="song.id" class="card" @click="playSong(song)">
+                            <div class="card-img">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title" class="song-cover">
+                                <button class="play-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Search View -->
+            <div v-if="currentView === 'search'" class="search-container">
+                <h2>Search Music</h2>
+                <div class="search-form">
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" v-model="searchQuery" placeholder="Start searching..." @input="performSearch">
+                    </div>
+
+                    <div class="filter-container">
+                        <div class="filter-group">
+                            <label>Sort by</label>
+                            <select v-model="searchFilters.sortBy" @change="performSearch">
+                                <option value="recent">Most Recent</option>
+                                <option value="plays">Most Played</option>
+                                <option value="likes">Most Liked</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Uploader</label>
+                            <input type="text" v-model="searchFilters.uploader" placeholder="Username" @input="performSearch">
+                        </div>
+                        <div class="filter-group">
+                            <label>Artist</label>
+                            <input type="text" v-model="searchFilters.artist" placeholder="Artist name" @input="performSearch">
+                        </div>
+                        <div class="filter-group">
+                            <label>Category</label>
+                            <select v-model="searchFilters.category" @change="performSearch">
+                                <option value="">Any Category</option>
+                                <option value="Other">Other</option>
+                                <option value="Pop">Pop</option>
+                                <option value="Rock">Rock</option>
+                                <option value="Hip Hop">Hip Hop</option>
+                                <option value="R&B">R&B</option>
+                                <option value="Dance">Dance</option>
+                                <option value="Electronic">Electronic</option>
+                                <option value="EDM">EDM</option>
+                                <option value="Dubstep">Dubstep</option>
+                                <option value="Phonk">Phonk</option>
+                                <option value="Jazz">Jazz</option>
+                                <option value="Classical">Classical</option>
+                                <option value="Country">Country</option>
+                                <option value="Folk">Folk</option>
+                                <option value="Indie">Indie</option>
+                                <option value="Metal">Metal</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Search by ID</label>
+                            <input type="text" v-model="searchFilters.songId" placeholder="Song ID" @input="performSearch">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-results" v-if="searchResults.length > 0">
+                    <h3>Results ({{ searchResults.length }})</h3>
+                    <div class="song-list">
+                        <div v-for="song in searchResults" :key="song.id" class="song-item">
+                            <div class="song-thumbnail">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title">
+                            </div>
+                            <div class="song-details">
+                                <h4>{{ song.title }}</h4>
+                                <p>{{ song.artist }} • {{ song.album || 'No Album' }}</p>
+                                <div class="song-stats">
+                                    <span><i class="fas fa-play"></i> {{ song.plays || 0 }}</span>
+                                    <span><i class="fas fa-heart"></i> {{ song.likes || 0 }}</span>
+                                    <span><i class="fas fa-user"></i> {{ song.username }}</span>
+                                    <span class="song-id" @click.stop="copySongId(song.id)" title="Click to copy song ID">
+                                        <i class="fas fa-copy"></i> ID: {{ song.id.substring(0, 8) }}...
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="song-actions">
+                                <button @click="toggleLike(song)" :class="{ 'liked': isLiked(song.id) }">
+                                    <i :class="isLiked(song.id) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                                </button>
+                                <button @click="openEditSongModal(song)" class="edit-song-btn" title="Edit Song" v-if="currentView === 'library'">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button @click="downloadSong(song)" class="download-btn" title="Download Song">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button @click="playSong(song)" class="play-song-btn">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-else-if="hasSearched" class="empty-search">
+                    <i class="fas fa-search"></i>
+                    <p>No results found. Try different search terms or filters.</p>
+                </div>
+            </div>
+
+            <!-- Liked Songs View -->
+            <div v-if="currentView === 'liked'" class="liked-songs-container">
+                <h2>Liked Songs</h2>
+                <div class="song-list" v-if="likedSongs.length > 0">
+                    <div v-for="song in likedSongs" :key="song.id" class="song-item">
+                        <div class="song-thumbnail">
+                            <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title">
+                        </div>
+                        <div class="song-details">
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.album || 'No Album' }}</p>
+                            <div class="song-stats">
+                                <span><i class="fas fa-play"></i> {{ song.plays || 0 }}</span>
+                                <span><i class="fas fa-heart"></i> {{ song.likes || 0 }}</span>
+                                <span><i class="fas fa-user"></i> {{ song.username }}</span>
+                                <span class="song-id" @click.stop="copySongId(song.id)" title="Click to copy song ID">
+                                    <i class="fas fa-copy"></i> ID: {{ song.id.substring(0, 8) }}...
+                                </span>
+                            </div>
+                        </div>
+                        <div class="song-actions">
+                            <button @click="toggleLike(song)" class="liked">
+                                <i class="fas fa-heart"></i>
+                            </button>
+                            <button @click="openEditSongModal(song)" class="edit-song-btn" title="Edit Song" v-if="currentView === 'library'">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="downloadSong(song)" class="download-btn" title="Download Song">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button @click="playSong(song)" class="play-song-btn">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="empty-list">
+                    <i class="fas fa-heart"></i>
+                    <p>You haven't liked any songs yet.</p>
+                </div>
+            </div>
+
+            <!-- Library View -->
+            <div v-if="currentView === 'library'" class="library-container">
+                <h2>Your Library</h2>
+                <div class="song-list" v-if="yourLibrary.length > 0">
+                    <div v-for="song in yourLibrary" :key="song.id" class="song-item">
+                        <div class="song-thumbnail">
+                            <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title">
+                        </div>
+                        <div class="song-details">
+                            <h4>{{ song.title }}</h4>
+                            <p>{{ song.artist }} • {{ song.album || 'No Album' }}</p>
+                            <div class="song-stats">
+                                <span><i class="fas fa-play"></i> {{ song.plays || 0 }}</span>
+                                <span><i class="fas fa-heart"></i> {{ song.likes || 0 }}</span>
+                                <span><i class="fas fa-music"></i> {{ song.category || 'Other' }}</span>
+                                <span class="song-id" @click.stop="copySongId(song.id)" title="Click to copy song ID">
+                                    <i class="fas fa-copy"></i> ID: {{ song.id.substring(0, 8) }}...
+                                </span>
+                            </div>
+                        </div>
+                        <div class="song-actions">
+                            <button @click="toggleLike(song)" :class="{ 'liked': isLiked(song.id) }">
+                                <i :class="isLiked(song.id) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                            </button>
+                            <button @click="openEditSongModal(song)" class="edit-song-btn" title="Edit Song">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="deleteSong(song)" class="delete-song-btn" title="Delete Song">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button @click="downloadSong(song)" class="download-btn" title="Download Song">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button @click="playSong(song)" class="play-song-btn">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div v-else class="empty-list">
+                    <i class="fas fa-music"></i>
+                    <p>You haven't uploaded any songs yet.</p>
+                </div>
+            </div>
+
+            <!-- Upload View -->
+            <div v-if="currentView === 'upload'" class="upload-container">
+                <h2>Upload Music</h2>
+                <form @submit.prevent="uploadSong" class="upload-form">
+                    <div class="form-group">
+                        <label for="song-file">Song File (MP3/OGG, max 10 minutes)*</label>
+                        <input type="file" id="song-file" @change="handleSongFileChange" accept=".mp3,.ogg" required>
+                        <div v-if="songFileError" class="error-message">{{ songFileError }}</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="song-title">Song Title*</label>
+                        <input type="text" id="song-title" v-model="uploadForm.title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="song-artist">Artist Name*</label>
+                        <input type="text" id="song-artist" v-model="uploadForm.artist" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="song-cover">Cover Image (Square Image)</label>
+                        <input type="file" id="song-cover" @change="handleCoverFileChange" accept="image/*">
+                        <div v-if="coverFileError" class="error-message">{{ coverFileError }}</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="song-category">Category</label>
+                        <select id="song-category" v-model="uploadForm.category">
+                            <option value="Other">Other</option>
+                            <option value="Pop">Pop</option>
+                            <option value="Rock">Rock</option>
+                            <option value="Hip Hop">Hip Hop</option>
+                            <option value="R&B">R&B</option>
+                            <option value="Dance">Dance</option>
+                            <option value="Electronic">Electronic</option>
+                            <option value="EDM">EDM</option>
+                            <option value="Dubstep">Dubstep</option>
+                            <option value="Phonk">Phonk</option>
+                            <option value="Jazz">Jazz</option>
+                            <option value="Classical">Classical</option>
+                            <option value="Country">Country</option>
+                            <option value="Folk">Folk</option>
+                            <option value="Indie">Indie</option>
+                            <option value="Metal">Metal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="song-album">Album</label>
+                        <input type="text" id="song-album" v-model="uploadForm.album">
+                    </div>
+                    <button type="submit" class="upload-btn" :disabled="isUploading">
+                        <i class="fas fa-upload"></i> {{ isUploading ? 'Uploading...' : 'Upload Song' }}
+                    </button>
+                </form>
+            </div>
+
+            <!-- Playlists View -->
+            <div v-if="currentView === 'playlists'" class="playlists-container">
+                <h2>Playlists</h2>
+                
+                <div class="playlists-actions">
+                    <button class="create-playlist-btn" @click="openCreatePlaylistModal">
+                        <i class="fas fa-plus"></i> Create New Playlist
+                    </button>
+                    <div class="search-playlists">
+                        <input type="text" v-model="playlistSearchQuery" placeholder="Search playlists..." @input="searchPlaylists">
+                    </div>
+                </div>
+                
+                <div v-if="!showCreatePlaylistForm && !selectedPlaylist">
+                    <div class="playlists-list" v-if="filteredPlaylists.length > 0">
+                        <div v-for="playlist in filteredPlaylists" :key="playlist.id" class="playlist-item" @click="viewPlaylist(playlist)">
+                            <div class="playlist-cover">
+                                <img :src="getPlaylistCover(playlist)" alt="Playlist Cover">
+                            </div>
+                            <div class="playlist-info">
+                                <h4>{{ playlist.name }}</h4>
+                                <p>{{ playlist.description || 'No description' }}</p>
+                                <div class="playlist-stats">
+                                    <span><i class="fas fa-music"></i> {{ playlist.songs ? playlist.songs.length : 0 }} songs</span>
+                                    <span><i class="fas fa-user"></i> {{ playlist.username }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="empty-list">
+                        <i class="fas fa-list"></i>
+                        <p>No playlists found.</p>
+                    </div>
+                </div>
+                
+                <!-- Create Playlist Form -->
+                <div v-if="showCreatePlaylistForm" class="create-playlist-form">
+                    <h3>Create New Playlist</h3>
+                    <div class="form-group">
+                        <label for="playlist-name">Playlist Name*</label>
+                        <input type="text" id="playlist-name" v-model="playlistForm.name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="playlist-description">Description</label>
+                        <textarea id="playlist-description" v-model="playlistForm.description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Add Songs</label>
+                        <div class="add-song-controls">
+                            <input type="text" v-model="songSearchInput" placeholder="Search by song name or paste ID">
+                            <button class="add-song-btn" @click="addSongToPlaylist">Add Song</button>
+                        </div>
+                        <p class="helper-text" v-if="songSearchError">{{ songSearchError }}</p>
+                    </div>
+                    
+                    <div class="playlist-songs-list" v-if="playlistForm.songs.length > 0">
+                        <h4>Songs in this playlist</h4>
+                        <div v-for="(song, index) in playlistForm.songs" :key="song.id" class="playlist-song-item">
+                            <div class="song-info">
+                                <span class="song-title">{{ song.title }}</span>
+                                <span class="song-artist">{{ song.artist }}</span>
+                            </div>
+                            <button class="remove-song-btn" @click="removeSongFromPlaylist(index)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="cancel-btn" @click="cancelCreatePlaylist">Cancel</button>
+                        <button class="save-btn" @click="savePlaylist" :disabled="!playlistForm.name">Save Playlist</button>
+                    </div>
+                </div>
+                
+                <!-- View Playlist -->
+                <div v-if="selectedPlaylist" class="view-playlist">
+                    <div class="playlist-header">
+                        <div class="back-button" @click="closePlaylist">
+                            <i class="fas fa-arrow-left"></i> Back to Playlists
+                        </div>
+                        <div class="playlist-details">
+                            <h3>{{ selectedPlaylist.name }}</h3>
+                            <p>{{ selectedPlaylist.description || 'No description' }}</p>
+                            <div class="playlist-meta">
+                                <span>Created by {{ selectedPlaylist.username }}</span>
+                                <span>{{ selectedPlaylist.songs ? selectedPlaylist.songs.length : 0 }} songs</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="playlist-songs" v-if="playlistSongs.length > 0">
+                        <div v-for="song in playlistSongs" :key="song.id" class="song-item">
+                            <div class="song-thumbnail">
+                                <img :src="song.coverUrl || '/2025_04_19_0zc_Kleki.png'" :alt="song.title">
+                            </div>
+                            <div class="song-details">
+                                <h4>{{ song.title }}</h4>
+                                <p>{{ song.artist }} • {{ song.album || 'No Album' }}</p>
+                                <div class="song-stats">
+                                    <span><i class="fas fa-play"></i> {{ song.plays || 0 }}</span>
+                                    <span><i class="fas fa-heart"></i> {{ song.likes || 0 }}</span>
+                                    <span><i class="fas fa-user"></i> {{ song.username }}</span>
+                                </div>
+                            </div>
+                            <div class="song-actions">
+                                <button @click="toggleLike(song)" :class="{ 'liked': isLiked(song.id) }">
+                                    <i :class="isLiked(song.id) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                                </button>
+                                <button @click="openEditSongModal(song)" class="edit-song-btn" title="Edit Song" v-if="currentView === 'library'">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button @click="downloadSong(song)" class="download-btn" title="Download Song">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button @click="playSong(song)" class="play-song-btn">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="empty-list">
+                        <i class="fas fa-music"></i>
+                        <p>This playlist doesn't have any songs yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News View -->
+            <div v-if="currentView === 'news'" class="news-container">
+                <h2>News</h2>
+                <div v-if="newsItems.length > 0" class="news-items">
+                    <div v-for="item in newsItems" :key="item.title" class="news-item">
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.content }}</p>
+                    </div>
+                </div>
+                <div v-else class="empty-list">
+                    <i class="fas fa-newspaper"></i>
+                    <p>No news available at the moment.</p>
+                </div>
+            </div>
+
+            <div v-if="currentView === 'profile'" class="placeholder-view">
+                <h2>Your Profile</h2>
+                <div v-if="currentUser" class="profile-details">
+                    <img :src="`https://images.websim.ai/avatar/${currentUser.username}`" alt="Profile" class="profile-avatar">
+                    <h3>@{{ currentUser.username }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="now-playing" v-if="currentTrack">
+            <div class="track-info">
+                <img class="album-cover" :src="currentTrack.coverUrl || '/2025_04_19_0zc_Kleki.png'" alt="Album Cover">
+                <div class="track-details">
+                    <h4>{{ currentTrack.title }}</h4>
+                    <p>{{ currentTrack.artist }}</p>
+                </div>
+                <button class="like-btn" @click="toggleLike(currentTrack)" :class="{ 'liked': isLiked(currentTrack.id) }">
+                    <i :class="isLiked(currentTrack.id) ? 'fas fa-heart' : 'far fa-heart'"></i>
+                </button>
+                <button class="copy-id-btn" @click="copySongId(currentTrack.id)" title="Copy Song ID">
+                    <i class="fas fa-copy"></i>
+                </button>
+                <button class="download-btn" @click="downloadSong(currentTrack)" title="Download Song">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+            <div class="player-controls">
+                <div class="control-buttons">
+                    <button><i class="fas fa-random"></i></button>
+                    <button><i class="fas fa-step-backward"></i></button>
+                    <button class="play-pause" @click="togglePlayPause"><i :class="isPlaying ? 'fas fa-pause' : 'fas fa-play'"></i></button>
+                    <button><i class="fas fa-step-forward"></i></button>
+                    <button><i class="fas fa-redo"></i></button>
+                </div>
+                <div class="progress-bar">
+                    <span class="current-time">{{ formatTime(currentTime) }}</span>
+                    <div class="progress-container" @click="seekTrack">
+                        <div class="progress" :style="{ width: `${progress}%` }"></div>
+                        <div class="progress-handle" :style="{ left: `${progress}%` }"></div>
+                    </div>
+                    <span class="total-time">{{ formatTime(duration) }}</span>
+                </div>
+            </div>
+            <div class="volume-controls">
+                <button><i class="fas fa-list"></i></button>
+                <button><i class="fas fa-desktop"></i></button>
+                <div class="volume-container">
+                    <i class="fas fa-volume-up"></i>
+                    <div class="volume-bar" @click="changeVolume">
+                        <div class="volume-level" :style="{ width: `${volume}%` }"></div>
+                        <div class="volume-handle" :style="{ left: `${volume}%` }"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <audio ref="audioPlayer" @timeupdate="updateProgress" @loadedmetadata="setDuration" @ended="songEnded"></audio>
+
+        <!-- Edit Song Modal -->
+        <div v-if="showEditSongModal" class="modal-overlay">
+            <div class="edit-song-modal">
+                <div class="modal-header">
+                    <h3>Edit Song</h3>
+                    <button class="close-modal-btn" @click="closeEditSongModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="updateSong" class="upload-form">
+                    <div class="form-group">
+                        <label for="edit-song-file">Replace Song File (MP3/OGG, max 10 minutes)</label>
+                        <input type="file" id="edit-song-file" @change="handleEditSongFileChange" accept=".mp3,.ogg">
+                        <div v-if="editSongFileError" class="error-message">{{ editSongFileError }}</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-song-title">Song Title*</label>
+                        <input type="text" id="edit-song-title" v-model="editSongForm.title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-song-artist">Artist Name*</label>
+                        <input type="text" id="edit-song-artist" v-model="editSongForm.artist" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-song-cover">Replace Cover Image (Square Image)</label>
+                        <input type="file" id="edit-song-cover" @change="handleEditCoverFileChange" accept="image/*">
+                        <div v-if="editCoverFileError" class="error-message">{{ editCoverFileError }}</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-song-category">Category</label>
+                        <select id="edit-song-category" v-model="editSongForm.category">
+                            <option value="Other">Other</option>
+                            <option value="Pop">Pop</option>
+                            <option value="Rock">Rock</option>
+                            <option value="Hip Hop">Hip Hop</option>
+                            <option value="R&B">R&B</option>
+                            <option value="Dance">Dance</option>
+                            <option value="Electronic">Electronic</option>
+                            <option value="EDM">EDM</option>
+                            <option value="Dubstep">Dubstep</option>
+                            <option value="Phonk">Phonk</option>
+                            <option value="Jazz">Jazz</option>
+                            <option value="Classical">Classical</option>
+                            <option value="Country">Country</option>
+                            <option value="Folk">Folk</option>
+                            <option value="Indie">Indie</option>
+                            <option value="Metal">Metal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-song-album">Album</label>
+                        <input type="text" id="edit-song-album" v-model="editSongForm.album">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="cancel-btn" @click="closeEditSongModal">Cancel</button>
+                        <button type="submit" class="save-btn" :disabled="isEditing">
+                            <i class="fas fa-save"></i> {{ isEditing ? 'Updating...' : 'Update Song' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
